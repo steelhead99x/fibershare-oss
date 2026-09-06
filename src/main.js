@@ -21,24 +21,18 @@ function pathFromHash() {
 }
 
 async function render() {
-  const path = pathFromHash();
-  const route = routes[path];
-  const view = route?.render || renderHome;
-  if (!route && path !== "/") {
-    document.title = "Not found · FiberShare OSS";
-  } else {
-    document.title = route?.title || routes["/"].title;
+  let path = pathFromHash();
+  if (!routes[path]) {
+    history.replaceState(null, "", "#/");
+    path = "/";
   }
-  const html = await view();
+  const route = routes[path];
+  document.title = route.title;
+  const html = await route.render();
   const app = document.getElementById("app");
   app.innerHTML = html;
   bindTheme(app);
   if (path === "/map") bindMap(app);
-  if (!route && path !== "/") {
-    // Unknown hash: keep home content but leave title as not-found signal.
-    // Prefer correcting the hash so nav state matches.
-    history.replaceState(null, "", "#/");
-  }
 }
 
 window.addEventListener("hashchange", render);
