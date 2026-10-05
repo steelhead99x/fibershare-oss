@@ -21,7 +21,7 @@ export function nav(active) {
     ["/", "Home"],
     ["/map", "Herd map"],
     ["/shop", "Fiber shop"],
-    ["/architecture", "Architecture"],
+    ["/architecture", "Build"],
   ]
     .map(([href, label]) => {
       const on = active === href;
@@ -56,7 +56,7 @@ export function footer() {
   ).join(" · ");
   return (
     '<footer class="site-footer"><div class="wrap">' +
-    "<small>MIT © 2026 Kyle Douglas · community MVP · sponsorship is support, not an investment</small><small>" +
+    "<small>© 2026 Kyle Douglas · Sponsorship supports animals and pasture. It is not ownership or an investment return.</small><small>" +
     items +
     "</small></div></footer>"
   );
