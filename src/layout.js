@@ -56,7 +56,8 @@ export function footer() {
   ).join(" · ");
   return (
     '<footer class="site-footer"><div class="wrap">' +
-    "<small>© 2026 Kyle Douglas · Sponsorship supports animals and pasture. It is not ownership or an investment return.</small><small>" +
+    "<small>© 2026 Kyle Douglas · Sponsorship supports animals and pasture. It is not ownership or an investment return.</small>" +
+    "<small>AI, ML, SI: the labels keep changing. We build for what the work needs.</small><small>" +
     items +
     "</small></div></footer>"
   );
