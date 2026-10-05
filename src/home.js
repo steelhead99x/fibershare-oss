@@ -42,8 +42,8 @@ export function renderHome() {
     "</ol>" +
     "</section>" +
     '<section class="section" id="join">' +
-    '<h2 class="section-rule">Open source</h2>' +
-    "<p>FiberShare is open source. You can read the code, run your own copy, or help build it.</p>" +
+    '<h2 class="section-rule">Free demo</h2>' +
+    "<p>You can read the code, run your own copy, or help build it.</p>" +
     "<p>This is free. You need a Discord account to chat. You need Node 20 to run a copy.</p>" +
     "<p>" +
     '<a href="' +
