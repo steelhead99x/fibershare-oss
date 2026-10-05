@@ -6,12 +6,12 @@ import { renderShop } from "./shop.js";
 import { renderArchitecture } from "./architecture.js";
 
 const routes = {
-  "/": { render: renderHome, title: "FiberShare OSS · community MVP" },
-  "/map": { render: renderMap, title: "Herd map · FiberShare OSS" },
-  "/shop": { render: renderShop, title: "Stub fiber shop · FiberShare OSS" },
+  "/": { render: renderHome, title: "FiberShare · follow a herd" },
+  "/map": { render: renderMap, title: "Herd map · FiberShare" },
+  "/shop": { render: renderShop, title: "Sample fiber · FiberShare" },
   "/architecture": {
     render: renderArchitecture,
-    title: "Architecture · FiberShare OSS",
+    title: "How it is built · FiberShare",
   },
 };
 
