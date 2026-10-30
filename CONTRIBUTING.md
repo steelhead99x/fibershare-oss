@@ -61,6 +61,6 @@ Use plain JavaScript and CSS. Keep files small. No framework is required.
 
 Make pages feel like a ranch notebook and a fiber list. Keep them plain and useful. Use numbered lists and tables.
 
-Headings use Source Serif 4. Text uses IBM Plex Sans. Both are self-hosted. Their license text is in `public/licenses/`.
+The site uses IBM Plex Sans. It is self-hosted. Its license text is in `public/licenses/`.
 
 Colors: paper `#f4efe6`, ink `#1c1916`, leather `#5c4030`, pasture `#4f5d41`, muted `#6e675c`. Use gold rarely, for rules and the active state.
