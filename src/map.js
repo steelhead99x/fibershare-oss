@@ -197,7 +197,7 @@ function renderPins(root, state) {
       pin.type = "button";
       pin.className = "goat";
       pin.dataset.id = animal.id;
-      pin.innerHTML = '<span aria-hidden="true">' + esc(initials(animal.name)) + "</span>";
+      pin.innerHTML = '<span aria-hidden="true">' + esc(initials(animal.alias || animal.name)) + "</span>";
       pin.addEventListener("click", () => select(root, animal.id));
       holder.appendChild(pin);
     }
