@@ -159,6 +159,6 @@ Chat is on [Discord](https://discord.gg/m3x8R3sF6N). You need a Discord account.
 
 ## License
 
-[MIT](LICENSE) © 2026 BitPrairie LLC, a California LLC · legal@bitprairie.com
+[MIT](LICENSE) © 2026 BitPrairie LLC · legal@bitprairie.com
 
 You may use, share, and change the code.
