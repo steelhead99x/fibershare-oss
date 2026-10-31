@@ -80,7 +80,7 @@ export function renderSetups() {
     '<li class="tile"><span class="tile-icon">' + icon("shield") + '</span><h3>Sharing is opt in</h3><p>Each rancher\'s event history is theirs. Planned: anything shared with agencies or researchers will be aggregated or delayed, with no exact locations.</p></li>' +
     '<li class="tile"><span class="tile-icon">' + icon("people") + '</span><h3>Community first</h3><p>The community network, self-hosted or run as a co-op, is the main part of the project. It is free for non-commercial and research use.</p></li>' +
     "</ul>" +
-    '<p class="fine-print">Ranch support pays for animals and pasture. Support is not ownership or an investment return.</p>' +
+    '<p class="fine-print">Support for a ranch pays for animals and pasture. Support is not ownership or an investment return.</p>' +
     "</section></main>" +
     footer()
   );

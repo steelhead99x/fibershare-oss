@@ -310,14 +310,14 @@ test("six jobs: each has an honest status, and only the tracker job is fully in 
       "Catch a dying or silent tracker",
       "Find an animal in trouble",
       "Warn neighbors about predator activity",
-      "Move ahead of fire or smoke",
+      "Plan a move ahead of fire or smoke",
       "Link fiber quality to breeding and grazing",
       "Plan the next paddock move",
     ]
   );
   for (const loop of LOOPS) {
     assert.ok(LOOP_STATUS[loop.status], loop.id);
-    if (loop.status === "works") assert.equal(loop.planned, "");
+    if (loop.status === "works") assert.ok(loop.done && loop.href, loop.id + " says what works and links to it");
     if (loop.status === "partly") assert.ok(loop.done && loop.planned, loop.id + " says what works and what is planned");
     if (loop.status === "planned") assert.equal(loop.href, "", loop.id + " links nowhere");
   }
