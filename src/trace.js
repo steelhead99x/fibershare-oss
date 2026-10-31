@@ -42,6 +42,9 @@ function value(key, v) {
   return esc(v);
 }
 
+// Record IDs are long. Show them in a smaller mono face that can break anywhere.
+const ID_FIELDS = new Set(["id", "fleeceIds", "shearingId", "animalId"]);
+
 function card(kind, file, record, schemaFile) {
   const shown = visibleRecord(record, viewer);
   const audience = record?.sharing?.audience || "private";
@@ -56,14 +59,14 @@ function card(kind, file, record, schemaFile) {
     );
   }
   const rows = Object.entries(shown.fields)
-    .map(([k, v]) => "<dt>" + esc(FIELD_LABELS[k] || k) + "</dt><dd>" + value(k, v) + "</dd>")
+    .map(([k, v]) => "<dt>" + esc(FIELD_LABELS[k] || k) + "</dt><dd" + (ID_FIELDS.has(k) ? ' class="fact-id"' : "") + ">" + value(k, v) + "</dd>")
     .join("");
   const hidden = shown.hidden.length
     ? '<p class="fine-print">Kept private: ' + shown.hidden.map((k) => esc(FIELD_LABELS[k] || k)).join(", ") + "</p>"
     : "";
   return (
     '<li class="trace-card">' + head +
-    "<h3><code>" + esc(record.id) + "</code></h3>" +
+    "<h3><code title=\"" + esc(record.id) + "\">" + esc(record.id) + "</code></h3>" +
     '<dl class="facts">' + rows + "</dl>" + hidden +
     '<p class="trace-file"><a href="' + REPO + "/blob/main/docs/schemas/" + esc(schemaFile) + '"' + EXT + ">" + esc(file) + "</a></p></li>"
   );

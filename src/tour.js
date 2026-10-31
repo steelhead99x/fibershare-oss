@@ -51,6 +51,8 @@ function build() {
 }
 
 function teardown() {
+  document.documentElement.style.removeProperty("--tour-reserve");
+  document.documentElement.classList.remove("tour-sheet");
   if (!els) return;
   window.removeEventListener("resize", schedule);
   window.removeEventListener("scroll", schedule);
@@ -113,6 +115,7 @@ function place() {
   Object.assign(els.spot.style, { top: top + "px", left: left + "px", width: Math.max(0, right - left) + "px", height: Math.max(0, bottom - top) + "px" });
   // On a phone the card docks to the bottom, or to the top when the target sits low (the bottom sheet).
   card.classList.toggle("at-top", (r.top + r.bottom) / 2 > innerHeight / 2);
+  reserveForCard(el, card);
   const cw = card.offsetWidth;
   const ch = card.offsetHeight;
   const gap = 16;
@@ -136,6 +139,19 @@ function place() {
   }
   card.style.top = Math.max(16, ct) + "px";
   card.style.left = Math.max(16, cl) + "px";
+}
+
+// A phone bottom sheet can grow taller than the space under a top-docked card.
+// Cap it so the sheet's header stays in view, then place the spotlight again.
+function reserveForCard(el, card) {
+  const root = document.documentElement;
+  const docked = card.classList.contains("at-top") && innerWidth <= 640 && getComputedStyle(el).position === "fixed";
+  const reserve = docked ? Math.ceil(card.getBoundingClientRect().bottom + 12) + "px" : "";
+  if (root.style.getPropertyValue("--tour-reserve") === reserve) return;
+  if (reserve) root.style.setProperty("--tour-reserve", reserve);
+  else root.style.removeProperty("--tour-reserve");
+  root.classList.toggle("tour-sheet", Boolean(reserve));
+  setTimeout(schedule, reduced() ? 0 : 320);
 }
 
 function drawCard(step) {

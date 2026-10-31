@@ -2033,6 +2033,11 @@ main.wrap {
 .trace-card .facts {
   font-size: var(--fs-sm);
 }
+.trace-card .facts dd.fact-id {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
 .trace-card .fine-print {
   margin: 0;
 }
@@ -2706,6 +2711,9 @@ main.wrap {
   .tour-card.at-top {
     top: 4.5rem !important;
     bottom: auto;
+  }
+  .tour-sheet .detail.is-open {
+    max-height: calc(100dvh - var(--tour-reserve, 0px));
   }
 }
 @media (hover: none) and (pointer: coarse) {

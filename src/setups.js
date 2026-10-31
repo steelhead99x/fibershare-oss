@@ -76,8 +76,8 @@ export function renderSetups() {
     '<section class="section">' +
     '<div class="section-head"><h2>In every setup</h2></div>' +
     '<ul class="card-grid cols-3">' +
-    '<li class="tile"><span class="tile-icon">' + icon("pin") + '</span><h3>Location is stripped or blurred</h3><p>No one can tell where a photo or an animal was. This demo goes further and uses a grid in place of a map for the public.</p></li>' +
-    '<li class="tile"><span class="tile-icon">' + icon("shield") + '</span><h3>Sharing is opt in</h3><p>Each rancher\'s event history is theirs. Sharing with agencies or researchers is grouped or delayed, with no exact locations.</p></li>' +
+    '<li class="tile"><span class="tile-icon">' + icon("pin") + '</span><h3>No locations in public</h3><p>Public pages never show where an animal is. In this demo the public sees a virtual grid. Only a signed-in rancher sees their own trackers on a map.</p></li>' +
+    '<li class="tile"><span class="tile-icon">' + icon("shield") + '</span><h3>Sharing is opt in</h3><p>Each rancher\'s event history is theirs. Planned: anything shared with agencies or researchers will be aggregated or delayed, with no exact locations.</p></li>' +
     '<li class="tile"><span class="tile-icon">' + icon("people") + '</span><h3>Community first</h3><p>The community network, self-hosted or run as a co-op, is the main part of the project. It is free for non-commercial and research use.</p></li>' +
     "</ul>" +
     '<p class="fine-print">Ranch support pays for animals and pasture. Support is not ownership or an investment return.</p>' +
