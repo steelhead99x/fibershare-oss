@@ -16,7 +16,7 @@ export const TOUR_STEPS = [
     target: "grid",
     herd: { moment: "end", select: "bramble" },
     title: "The herd",
-    body: "Eight sample goats on a paddock grid. Each pin is one goat wearing a LoRa tracker. Tap a pin to see that goat's battery and last check-in.",
+    body: "Eight sample goats on a paddock grid. Each pin is one goat wearing a LoRaWAN collar tracker. Tap a pin to see that goat's battery and last check-in.",
   },
   {
     id: "smoke",
@@ -35,6 +35,14 @@ export const TOUR_STEPS = [
     simulated: true,
     title: "A predator alert",
     body: "At 16:40, Predator Watch reports a likely coyote at the edge of cell A1. Minutes later the trackers show the goats moving away from it. This alert is simulated.",
+  },
+  {
+    id: "alerts",
+    route: "/map",
+    target: "alerts",
+    herd: { moment: "end" },
+    title: "Alerts to answer",
+    body: "Low battery and quiet-tracker alerts come from the tracker data. Confirm an alert if it is real, or dismiss it, with a note if you like. Answered alerts move to the history list.",
   },
   {
     id: "animal",

@@ -59,6 +59,7 @@ test("tour: ids are unique and the order is herd, alert, fleece trace, rancher m
   assert.equal(new Set(ids).size, ids.length);
   const at = (id) => ids.indexOf(id);
   assert.ok(at("herd") < at("predator") && at("predator") < at("trace") && at("trace") < at("rancher-map"));
+  assert.ok(at("predator") < at("alerts") && at("alerts") < at("trace"), "the alerts step follows the predator alert");
   assert.deepEqual(TOUR_KEYS, { seen: "fs-tour-seen", step: "fs-tour-step" });
 });
 

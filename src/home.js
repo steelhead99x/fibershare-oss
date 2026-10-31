@@ -2,6 +2,7 @@ import { APP, DISCORD, REPO } from "./sites.js";
 import { nav, footer } from "./layout.js";
 import { EXT } from "./util.js";
 import { icon } from "./icons.js";
+import { LOOPS, LOOP_STATUS } from "./loops.js";
 
 // A still picture of the herd view for the home page. It uses the sample
 // herd's grid cells, and is drawn with HTML, so it costs no extra request.
@@ -11,7 +12,7 @@ const PREVIEW_PINS = [
   ["Cl", 48, 68],
   ["Br", 76, 62, true],
   ["Sa", 82, 70],
-  ["Wi", 55, 80],
+  ["Wi", 50, 74],
   ["Pi", 42, 30],
   ["Ha", 66, 52],
 ];
@@ -33,7 +34,7 @@ function preview() {
     '<span class="alert-card preview-toast"><span class="alert-icon">' + icon("paw", { size: 18 }) + "</span>" +
     "<span><strong>Predator alert near A1</strong><small>16:40 · the herd moved away</small></span></span>" +
     '<span class="preview-stats">' +
-    "<span><strong>8</strong>goats</span><span><strong>7</strong>checked in</span><span><strong>1</strong>low battery</span><span><strong>1</strong>open alert</span>" +
+    "<span><strong>8</strong>goats</span><span><strong>7</strong>checked in</span><span><strong>1</strong>low battery</span><span><strong>4</strong>open alerts</span>" +
     "</span></span></a>"
   );
 }
@@ -68,13 +69,22 @@ export function renderHome() {
     "</div>" +
     preview() +
     "</section>" +
-    '<section class="home-band" aria-labelledby="see-title">' +
-    '<div class="section-head"><div><h2 id="see-title">What you can see</h2><p>Each part runs on sample data. Nothing here is a real ranch.</p></div></div>' +
-    '<ul class="card-grid">' +
-    tile("herd", "Herd view", "Eight sample goats on a paddock grid, with tracker battery and check-ins for each one.", "#/map", "Open the herd view") +
-    tile("alert", "A day of alerts", "Play back one sample day: a weak battery, a quiet tracker, smoke upwind, and a coyote near the herd.", "#/map", "Play the day", '<span class="badge badge-sim">Simulated</span>') +
-    tile("fleece", "Fleece to fiber lot", "Follow a fiber lot back to Bramble the goat, and see what a buyer or the public can see.", "#/trace", "Follow the fleece") +
-    tile("map", "Rancher map", "A signed-in rancher sees real tracker positions on a map. The public only gets the hidden grid.", "#/rancher", "How sign-in works") +
+    '<section class="home-band" aria-labelledby="see-title" data-tour="loops">' +
+    '<div class="section-head"><div><h2 id="see-title">What FiberShare helps with</h2><p>Six jobs on a ranch. The badge on each one says how much of it this demo does today.</p></div></div>' +
+    '<ul class="card-grid cols-3 loops">' +
+    LOOPS.map((loop) => {
+      const [cls, label] = LOOP_STATUS[loop.status];
+      const text =
+        (loop.done ? "<p>" + loop.done + "</p>" : "") +
+        (loop.planned ? '<p class="loop-next"><strong>Planned:</strong> ' + loop.planned + "</p>" : "");
+      return (
+        '<li class="tile' + (loop.href ? " tile-link" : "") + '" data-loop="' + loop.id + '">' +
+        '<div class="tile-head"><span class="tile-icon">' + icon(loop.icon) + '</span><span class="badge ' + cls + '">' + label + "</span></div>" +
+        "<h3>" + loop.title + "</h3>" + text +
+        (loop.href ? '<a class="link-arrow stretch" href="' + loop.href + '">' + loop.link + icon("arrowRight", { size: 16 }) + "</a>" : "") +
+        "</li>"
+      );
+    }).join("") +
     "</ul></section>" +
     '<section class="home-band" aria-labelledby="setups-title">' +
     '<div class="section-head"><div><h2 id="setups-title">Three setups</h2><p>The same trackers and records run three ways. You can change later.</p></div>' +

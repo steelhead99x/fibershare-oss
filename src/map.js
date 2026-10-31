@@ -6,8 +6,18 @@ import { icon } from "./icons.js";
 import { spreadPins } from "./pin-spread.js";
 import { loadHerd, setHideTrackers, setPreferSample } from "./data.js";
 import { lotsForAnimal } from "./records-data.js";
+import { ALERT_RULES } from "./alert-config.js";
+import { computeAlerts, latestAnswers, splitAlerts } from "./alerts.js";
+import { alertScope, createAlertStore } from "./alert-store.js";
 
-const LOW_BATTERY = 25;
+const LOW_BATTERY = ALERT_RULES.lowBatteryPercent;
+const ALERT_KIND = {
+  battery: ["battery", "Low battery"],
+  quiet: ["wifiOff", "Quiet tracker"],
+  sos: ["alert", "SOS"],
+  predator: ["paw", "Predator Watch"],
+  smoke: ["smoke", "Wildfire Watch"],
+};
 const EVENT_LABELS = {
   checkin: "Check-in",
   battery: "Battery",
@@ -104,6 +114,31 @@ function stage(data, animals, live, cells) {
   );
 }
 
+function hours(minutes) {
+  return minutes % 60 ? minutes + " minutes" : minutes / 60 + " hours";
+}
+
+function alertsSection(data, live) {
+  return (
+    '<section class="section alerts-section" data-tour="alerts" aria-labelledby="alerts-title">' +
+    '<div class="feed-head"><h2 class="section-rule" id="alerts-title">Alerts</h2>' +
+    (live ? '<span class="badge badge-live">From your trackers</span>' : '<span class="badge badge-sim">Sample day</span>') +
+    "</div>" +
+    '<p class="muted feed-note">Low battery: below ' + ALERT_RULES.lowBatteryPercent + "% and not on outside power. Quiet tracker: nothing heard for over " + hours(ALERT_RULES.quietMinutes) + "." +
+    (live ? "" : " Predator Watch and Wildfire Watch alerts here are simulated.") +
+    " Confirm an alert if it is real. Dismiss it if it is not.</p>" +
+    '<p class="notice notice-warn alert-error" data-alert-error role="alert" hidden></p>' +
+    '<p class="visually-hidden" data-alert-status role="status"></p>' +
+    '<div class="alerts-cols" data-alerts>' +
+    '<div><h3 class="alerts-sub">Open <span class="count" data-open-count></span></h3><ol class="alert-list" data-alert-open></ol></div>' +
+    '<div><h3 class="alerts-sub">History</h3><ol class="alert-list alert-history" data-alert-history></ol></div>' +
+    "</div>" +
+    '<p class="fine-print alerts-foot"><span data-alert-where></span> Each answer is kept as a feedback record with the rule that raised the alert. ' +
+    '<span class="badge badge-planned">Planned</span> Tuning the rules from these answers.</p>' +
+    "</section>"
+  );
+}
+
 const PLAY = icon("play", { size: 16 }) + "<span>Play the day</span>";
 const PAUSE = icon("pause", { size: 16 }) + "<span>Pause</span>";
 
@@ -148,6 +183,11 @@ export async function renderMap() {
     selected: null,
     filter: "all",
     timer: null,
+    store: createAlertStore(alertScope(data)),
+    feedback: [],
+    feedbackReady: false,
+    alertError: "",
+    saving: false,
   };
   const animals = data.animals;
   view.selected = (animals.find((a) => a.id === "bramble") || animals[0] || {}).id || null;
@@ -202,6 +242,7 @@ export async function renderMap() {
       icon("chevronUp", { cls: "i-up" }) + icon("chevronDown", { cls: "i-down" }) + "</button>" +
       '<div class="detail-body" data-detail-body aria-live="polite"></div></aside>' +
       "</div>" +
+      alertsSection(data, live) +
       '<div class="herd-lower">' +
       '<section class="section" aria-labelledby="herd-list-title"><h2 class="section-rule" id="herd-list-title">' +
       (live ? "Trackers" : "Herd") +
@@ -247,7 +288,20 @@ export async function renderMap() {
 let resizeObserver = null;
 
 function currentState() {
-  return stateAt(view.data.animals, view.events, view.step);
+  const sample = view.data.mode !== "live";
+  return stateAt(view.data.animals, view.events, view.step, sample ? { uplinksStart: view.data.uplinksStart, now: clockIso() } : {});
+}
+
+// The time alerts are measured from: the sample day's clock, or the real
+// clock for live data at the end of the feed.
+function alertNow() {
+  if (view.data.mode === "live" && view.step >= view.events.length) return new Date().toISOString();
+  return clockIso();
+}
+
+function alertsFor(state) {
+  const all = computeAlerts({ animals: state.animals, events: state.shown, now: alertNow() });
+  return { all, ...splitAlerts(all, view.feedback) };
 }
 
 function clockIso() {
@@ -256,7 +310,7 @@ function clockIso() {
   return event ? event.time : view.data.now;
 }
 
-function renderPins(root, state) {
+function renderPins(root, state, alerts) {
   const holder = root.querySelector("[data-pins]");
   if (!holder) return;
   const existing = new Map([...holder.querySelectorAll(".goat")].map((el) => [el.dataset.id, el]));
@@ -283,38 +337,41 @@ function renderPins(root, state) {
     pin.style.top = at.y.toFixed(2) + "%";
     const on = animal.id === view.selected;
     pin.classList.toggle("is-active", on);
-    pin.classList.toggle("is-low", Number.isFinite(animal.battery) && animal.battery < LOW_BATTERY);
-    pin.classList.toggle("is-silent", animal.silent);
+    const mine = alerts.all.filter((a) => a.animalId === animal.id);
+    pin.classList.toggle("is-low", mine.some((a) => a.kind === "battery"));
+    pin.classList.toggle("is-silent", animal.silent || mine.some((a) => a.kind === "quiet"));
+    pin.classList.toggle("has-alert", alerts.open.some((a) => a.animalId === animal.id));
     pin.classList.toggle("is-sos", Boolean(animal.sos || animal.sensors?.sos));
     pin.setAttribute("aria-pressed", String(on));
     // The accessible name is the full name, which the pin shows when picked.
-    const label = animal.name + (view.data.mapSpan ? "" : ", cell " + cellOf(animal.x, animal.y));
+    const open = alerts.open.filter((a) => a.animalId === animal.id).map((a) => ALERT_KIND[a.kind][1].toLowerCase());
+    const label = animal.name + (view.data.mapSpan ? "" : ", cell " + cellOf(animal.x, animal.y)) + (open.length ? ", open alert: " + open.join(", ") : "");
     const holderLabel = pin.querySelector("[data-pin-label]");
     if (holderLabel && holderLabel.textContent !== label) holderLabel.textContent = label;
     pin.title = animal.name;
   }
 }
 
-function renderStats(root, state) {
+function renderStats(root, state, alerts) {
   const holder = root.querySelector("[data-stats]");
   if (!holder) return;
   // Live data counts from the real clock; the sample day from its own clock.
   const now = view.data.mode === "live" ? Date.now() : new Date(clockIso()).getTime();
   const recent = state.animals.filter((a) => a.lastSeen && now - new Date(a.lastSeen).getTime() <= 3600000).length;
-  const low = state.animals.filter((a) => Number.isFinite(a.battery) && a.battery < LOW_BATTERY).length;
-  const alerts = state.alertCells.length + (state.smoke ? 1 : 0) + state.animals.filter((a) => a.silent || a.sos).length;
+  const low = alerts.all.filter((a) => a.kind === "battery").length;
+  const open = alerts.open.length;
   const stats = [
     [state.animals.length, view.data.mode === "live" ? "trackers" : "animals", "herd", ""],
     [recent, "checked in, last hour", "signal", ""],
     [low, "low battery", "battery", low > 0 ? " stat-low" : ""],
-    [alerts, alerts === 1 ? "open alert" : "open alerts", "alert", alerts > 0 ? " stat-warn" : ""],
+    [open, open === 1 ? "open alert" : "open alerts", "alert", open > 0 ? " stat-warn" : ""],
   ];
   holder.innerHTML = stats
     .map(([n, label, iconName, cls]) => '<div class="stat' + cls + '"><span class="stat-icon">' + icon(iconName) + "</span><div><strong>" + n + "</strong><span>" + label + "</span></div></div>")
     .join("");
 }
 
-function renderGrid(root, state) {
+function renderGrid(root, state, alerts) {
   root.querySelectorAll(".cell").forEach((cell) => {
     cell.classList.toggle("is-alert", state.alertCells.includes(cell.dataset.cell));
   });
@@ -323,10 +380,22 @@ function renderGrid(root, state) {
   const banner = root.querySelector("[data-banner]");
   if (banner) {
     const cards = [];
-    for (const cell of state.alertCells) cards.push(["paw", "", "Predator alert near " + cell, "Predator Watch · the herd is moving away"]);
-    if (state.smoke) cards.push(["smoke", " is-smoke", "Smoke haze upwind", "Wildfire Watch · no fire reported nearby"]);
+    const answers = latestAnswers(view.feedback);
+    const answerOf = (kind, cell) => {
+      const a = alerts.all.find((x) => x.kind === kind && !x.cleared && (kind !== "predator" || x.title.endsWith(cell)));
+      const f = a && answers.get(a.id);
+      return f && f.answer !== "reopened" ? f.answer : "";
+    };
+    for (const cell of state.alertCells) cards.push(["paw", "", "Predator alert near " + cell, "Predator Watch · the herd is moving away", answerOf("predator", cell)]);
+    if (state.smoke) cards.push(["smoke", " is-smoke", "Smoke haze upwind", "Wildfire Watch · no fire reported nearby", answerOf("smoke")]);
     const html = cards
-      .map(([name, cls, title, sub]) => '<div class="alert-card' + cls + '" role="status"><span class="alert-icon">' + icon(name, { size: 18 }) + "</span><span><strong>" + esc(title) + "</strong><small>" + esc(sub) + '</small></span><span class="badge badge-sim">Simulated</span></div>')
+      .map(
+        ([name, cls, title, sub, answer]) =>
+          '<div class="alert-card' + cls + '" role="status"><span class="alert-icon">' + icon(name, { size: 18 }) + "</span><span><strong>" + esc(title) + "</strong><small>" + esc(sub) + "</small></span>" +
+          (answer ? '<span class="badge ' + (answer === "confirmed" ? "badge-warn" : "badge-quiet") + '">' + (answer === "confirmed" ? "Confirmed" : "Dismissed") + "</span>" : "") +
+          (view.data.mode === "live" ? "" : '<span class="badge badge-sim">Simulated</span>') +
+          "</div>"
+      )
       .join("");
     banner.hidden = cards.length === 0;
     // Only touch the DOM when the alerts change, so the cards do not flicker.
@@ -402,7 +471,7 @@ function sensorRows(animal) {
   return rows;
 }
 
-function renderDetail(root, state) {
+function renderDetail(root, state, alerts) {
   const holder = root.querySelector("[data-detail-body]");
   if (!holder) return;
   const animal = state.animals.find((a) => a.id === view.selected);
@@ -428,6 +497,15 @@ function renderDetail(root, state) {
     ["Last check-in", animal.lastSeen ? esc(timeOf(animal.lastSeen)) + ' <span class="muted">(' + esc(ago(animal.lastSeen, clockIso())) + ")</span>" : '<span class="muted">not yet</span>'],
     ...(full && animal.onMap ? [] : [["Grid cell", esc(cellOf(animal.x, animal.y))]]),
     ...(live ? sensorRows(animal) : []),
+    [
+      "Alerts",
+      alerts.open.some((a) => a.animalId === animal.id)
+        ? alerts.open
+            .filter((a) => a.animalId === animal.id)
+            .map((a) => '<span class="badge ' + (a.kind === "quiet" ? "badge-quiet" : a.kind === "sos" ? "badge-alert" : "badge-warn") + '">' + esc(ALERT_KIND[a.kind][1]) + "</span>")
+            .join(" ") + ' <button type="button" class="btn-link" data-jump-alerts>Answer</button>'
+        : '<span class="muted">none open</span>',
+    ],
   ];
   if (!live) {
     rows.splice(0, 0, ["Breed", esc(animal.breed)], ["Color", esc(animal.color)], ["Fiber", esc(animal.fiber)]);
@@ -448,7 +526,7 @@ function renderDetail(root, state) {
     (full ? '<p class="fine-print">Private: you are signed in as the rancher. Do not share a screenshot of this view.</p>' : "");
 }
 
-function renderList(root, state) {
+function renderList(root, state, alerts) {
   const holder = root.querySelector("[data-list]");
   if (!holder) return;
   const live = view.data.mode === "live";
@@ -462,8 +540,8 @@ function renderList(root, state) {
         '<li><button type="button" class="goat-row' + (on ? " selected" : "") + '" data-goat-card="' + esc(animal.id) + '" aria-pressed="' + on + '">' +
         '<span class="avatar" aria-hidden="true">' + esc(initials(animal.alias || animal.name)) + "</span>" +
         "<div><h3>" + esc(animal.name) +
-        (Number.isFinite(animal.battery) && animal.battery < LOW_BATTERY ? ' <span class="badge badge-warn">Low battery</span>' : "") +
-        (animal.silent ? ' <span class="badge badge-quiet">Quiet</span>' : "") +
+        (alerts.all.some((a) => a.animalId === animal.id && a.kind === "battery") ? ' <span class="badge badge-warn">Low battery</span>' : "") +
+        (animal.silent || alerts.all.some((a) => a.animalId === animal.id && a.kind === "quiet") ? ' <span class="badge badge-quiet">Quiet</span>' : "") +
         (animal.sos || animal.sensors?.sos ? ' <span class="badge badge-alert">SOS</span>' : "") +
         '</h3><p class="row-meta">' + meta.filter(Boolean).map(esc).join(" · ") + "</p></div></button></li>"
       );
@@ -489,7 +567,7 @@ function renderFeed(root, state) {
       const kind = event.type === "predator" || event.type === "smoke" || event.type === "sos" || event.severity === "alert" ? "is-alert" : isAlert(event) ? "is-watch" : "";
       const who = names.get(event.animalId);
       return (
-        '<li class="feed-item ' + kind + '"' + (event.animalId ? ' data-event-animal="' + esc(event.animalId) + '"' : "") + ">" +
+        '<li class="feed-item ' + kind + '"' + (event.animalId ? ' data-event-animal="' + esc(event.animalId) + '" tabindex="0" role="button" aria-label="Show ' + esc(who && view.data.mode !== "live" ? who : "this animal") + ": " + esc(event.text) + '"' : "") + ">" +
         '<span class="feed-icon" aria-hidden="true">' + icon(EVENT_ICONS[event.type] || "info", { size: 16 }) + "</span>" +
         '<time datetime="' + esc(event.time) + '">' + esc(timeOf(event.time)) + "</time>" +
         '<div><span class="feed-type">' + esc(EVENT_LABELS[event.type] || event.type) + (who && view.data.mode !== "live" ? " · " + esc(who) : "") + "</span>" +
@@ -499,17 +577,173 @@ function renderFeed(root, state) {
     .join("");
   holder.querySelectorAll("[data-event-animal]").forEach((item) => {
     item.addEventListener("click", () => select(root, item.dataset.eventAnimal));
+    item.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      select(root, item.dataset.eventAnimal);
+    });
   });
+}
+
+function answeredAt(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function isEvent(kind) {
+  return kind === "predator" || kind === "smoke";
+}
+
+function openItem(alert, simulated) {
+  const [iconName, label] = ALERT_KIND[alert.kind];
+  const noteId = "note-" + alert.id.replace(/[^A-Za-z0-9_-]/g, "-");
+  const who = alert.animalId ? view.data.animals.find((a) => a.id === alert.animalId) : null;
+  return (
+    '<li class="alert-item kind-' + alert.kind + '" data-alert="' + esc(alert.id) + '">' +
+    '<span class="alert-icon" aria-hidden="true">' + icon(iconName, { size: 18 }) + "</span>" +
+    '<div class="alert-body">' +
+    '<p class="alert-title"><strong>' + esc(alert.title) + "</strong>" +
+    (simulated ? ' <span class="badge badge-sim">Simulated</span>' : "") +
+    (alert.cleared ? ' <span class="badge badge-quiet">Cleared</span>' : "") +
+    "</p>" +
+    '<p class="alert-detail">' + esc(alert.detail.replace(/^(Predator|Wildfire) Watch:\s*(.)/, (m, w, c) => c.toUpperCase())) + "</p>" +
+    '<p class="row-meta">' + (isEvent(alert.kind) ? "" : esc(label) + " · ") + '<time datetime="' + esc(alert.time) + '">' + esc(timeOf(alert.time)) + "</time>" +
+    (who ? ' · <button type="button" class="btn-link" data-alert-animal="' + esc(who.id) + '">Show ' + esc(who.name) + "</button>" : "") +
+    "</p>" +
+    '<div class="alert-answer">' +
+    '<label class="visually-hidden" for="' + noteId + '">Note for this answer (optional)</label>' +
+    '<input id="' + noteId + '" class="alert-note" type="text" maxlength="' + ALERT_RULES.noteMaxLength + '" placeholder="Note (optional)" autocomplete="off" data-alert-note />' +
+    '<button type="button" class="btn btn-primary btn-small" data-answer="confirmed">' + icon("check", { size: 14 }) + "Confirm</button>" +
+    '<button type="button" class="btn btn-ghost btn-small" data-answer="dismissed">Dismiss</button>' +
+    "</div></div></li>"
+  );
+}
+
+function historyItem(entry) {
+  const [iconName, label] = ALERT_KIND[entry.kind] || ["info", "Alert"];
+  const confirmed = entry.answer === "confirmed";
+  return (
+    '<li class="alert-item is-answered kind-' + esc(entry.kind) + '" data-alert="' + esc(entry.alertId) + '">' +
+    '<span class="alert-icon" aria-hidden="true">' + icon(iconName, { size: 18 }) + "</span>" +
+    '<div class="alert-body">' +
+    '<p class="alert-title"><span class="badge ' + (confirmed ? "badge-warn" : "badge-quiet") + '">' + (confirmed ? "Confirmed" : "Dismissed") + "</span> <strong>" + esc(entry.title || label) + "</strong></p>" +
+    (entry.note ? '<p class="alert-detail alert-note-text">“' + esc(entry.note) + "”</p>" : "") +
+    '<p class="row-meta">' + [isEvent(entry.kind) ? "" : label, entry.alertTime ? "alert at " + timeOf(entry.alertTime) : "", "answered " + answeredAt(entry.at)].filter(Boolean).map(esc).join(" · ") +
+    ' · <button type="button" class="btn-link" data-reopen>Reopen</button></p>' +
+    "</div></li>"
+  );
+}
+
+function renderAlerts(root, alerts) {
+  const openList = root.querySelector("[data-alert-open]");
+  const historyList = root.querySelector("[data-alert-history]");
+  if (!openList || !historyList) return;
+  const err = root.querySelector("[data-alert-error]");
+  if (err) {
+    err.hidden = !view.alertError;
+    err.textContent = view.alertError;
+  }
+  const where = root.querySelector("[data-alert-where]");
+  if (where) where.textContent = view.store.where;
+  const count = root.querySelector("[data-open-count]");
+  if (count) count.textContent = String(alerts.open.length);
+  const live = view.data.mode === "live";
+  const key = JSON.stringify([alerts.open.map((a) => a.id + a.cleared), alerts.history.map((f) => f.alertId + f.answer + f.at), view.feedbackReady, view.saving]);
+  // Redraw only when the lists change, so a note being typed is kept.
+  if (openList.dataset.key === key) return;
+  openList.dataset.key = key;
+  const notes = new Map([...openList.querySelectorAll("[data-alert]")].map((li) => [li.dataset.alert, li.querySelector("[data-alert-note]")?.value || ""]));
+  const focusId = document.activeElement?.closest?.("[data-alert]")?.dataset.alert;
+  if (!view.feedbackReady) {
+    openList.innerHTML = '<li class="feed-empty">Loading answers…</li>';
+    historyList.innerHTML = "";
+    return;
+  }
+  openList.innerHTML = alerts.open.length
+    ? alerts.open.map((a) => openItem(a, !live && (a.kind === "predator" || a.kind === "smoke"))).join("")
+    : '<li class="feed-empty">' + (view.step < view.events.length ? "No open alerts at this point in the day." : "No open alerts.") + "</li>";
+  historyList.innerHTML = alerts.history.length ? alerts.history.slice(0, 40).map(historyItem).join("") : '<li class="feed-empty">No answers yet. Confirmed and dismissed alerts move here.</li>';
+  for (const li of openList.querySelectorAll("[data-alert]")) {
+    const input = li.querySelector("[data-alert-note]");
+    if (input && notes.get(li.dataset.alert)) input.value = notes.get(li.dataset.alert);
+    li.querySelectorAll("button[data-answer]").forEach((b) => (b.disabled = view.saving));
+    if (li.dataset.alert === focusId) input?.focus();
+  }
+}
+
+async function answer(root, alertId, value, note) {
+  const state = currentState();
+  const alerts = alertsFor(state);
+  const alert = alerts.all.find((a) => a.id === alertId);
+  const past = latestAnswers(view.feedback).get(alertId);
+  const base = alert
+    ? { kind: alert.kind, title: alert.title, animalId: alert.animalId, alertTime: alert.time }
+    : past
+      ? { kind: past.kind, title: past.title, animalId: past.animalId, alertTime: past.alertTime }
+      : null;
+  if (!base) return;
+  view.saving = true;
+  view.alertError = "";
+  draw(root);
+  try {
+    view.feedback = await view.store.add({ alertId, answer: value, note: note || "", ...base });
+  } catch (error) {
+    view.alertError = "The answer was not saved. " + (error?.message || "");
+  }
+  view.saving = false;
+  draw(root);
+  const status = root.querySelector("[data-alert-status]");
+  if (status && !view.alertError) status.textContent = value === "reopened" ? "Alert reopened." : value === "confirmed" ? "Alert confirmed." : "Alert dismissed.";
+}
+
+async function loadFeedback(root) {
+  try {
+    view.feedback = await view.store.load();
+  } catch (error) {
+    view.feedback = [];
+    view.alertError = "Answers did not load. " + (error?.message || "");
+  }
+  view.feedbackReady = true;
+  if (document.body.contains(root.querySelector("[data-alerts]"))) draw(root);
+}
+
+function bindAlerts(root) {
+  const box = root.querySelector("[data-alerts]");
+  if (!box) return;
+  box.addEventListener("click", (event) => {
+    const li = event.target.closest("[data-alert]");
+    const show = event.target.closest("[data-alert-animal]");
+    if (show) {
+      select(root, show.dataset.alertAnimal);
+      root.querySelector("#paddock, [data-rancher-map]")?.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
+      return;
+    }
+    if (!li || view.saving) return;
+    const btn = event.target.closest("[data-answer]");
+    if (btn) return answer(root, li.dataset.alert, btn.dataset.answer, li.querySelector("[data-alert-note]")?.value);
+    if (event.target.closest("[data-reopen]")) return answer(root, li.dataset.alert, "reopened", "");
+  });
+  box.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || !event.target.matches("[data-alert-note]")) return;
+    event.preventDefault();
+    const li = event.target.closest("[data-alert]");
+    answer(root, li.dataset.alert, "confirmed", event.target.value);
+  });
+  loadFeedback(root);
 }
 
 function draw(root) {
   const state = currentState();
-  renderPins(root, state);
-  renderStats(root, state);
-  renderGrid(root, state);
-  renderDetail(root, state);
-  renderList(root, state);
+  const alerts = alertsFor(state);
+  renderPins(root, state, alerts);
+  renderStats(root, state, alerts);
+  renderGrid(root, state, alerts);
+  renderDetail(root, state, alerts);
+  renderList(root, state, alerts);
   renderFeed(root, state);
+  renderAlerts(root, alerts);
+  rancherMap?.setAlerts?.(alerts.open.map((a) => a.animalId).filter(Boolean));
   const scrub = root.querySelector("[data-scrub]");
   if (scrub) scrub.value = String(view.step);
 }
@@ -527,6 +761,25 @@ function setSheet(root, open) {
   if (!aside || !handle) return;
   aside.classList.toggle("is-open", open);
   handle.setAttribute("aria-expanded", String(open));
+  syncSheetInert(root);
+}
+
+// On phones the detail is a bottom sheet. While it is closed, its links and
+// buttons sit off screen, so keep them out of the tab order.
+const SHEET_QUERY = "(max-width: 860px)";
+let sheetWatch = null;
+
+function syncSheetInert(root) {
+  const aside = root?.querySelector("[data-detail]");
+  const body = aside?.querySelector("[data-detail-body]");
+  if (!body) return;
+  body.inert = !aside.classList.contains("is-open") && window.matchMedia(SHEET_QUERY).matches;
+}
+
+function watchSheet() {
+  if (sheetWatch || !window.matchMedia) return;
+  sheetWatch = window.matchMedia(SHEET_QUERY);
+  sheetWatch.addEventListener?.("change", () => syncSheetInert(document.getElementById("app")));
 }
 
 function reset(root) {
@@ -603,6 +856,7 @@ export function bindMap(root) {
     window.dispatchEvent(new HashChangeEvent("hashchange"));
   });
   if (!view.data.animals.length) return;
+  bindAlerts(root);
   draw(root);
   // Spread the pins again when the paddock changes size (rotation, resize).
   const paddock = root.querySelector("#paddock");
@@ -613,10 +867,19 @@ export function bindMap(root) {
       if (!paddock.isConnected) return resizeObserver.disconnect();
       if (Math.abs(paddock.clientWidth - last) < 2) return;
       last = paddock.clientWidth;
-      renderPins(root, currentState());
+      const state = currentState();
+      renderPins(root, state, alertsFor(state));
     });
     resizeObserver.observe(paddock);
   }
+  root.querySelector("[data-detail]")?.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-jump-alerts]")) return;
+    event.preventDefault();
+    setSheet(root, false);
+    root.querySelector("#alerts-title")?.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
+  });
+  watchSheet();
+  syncSheetInert(root);
   root.querySelector("[data-sheet]")?.addEventListener("click", () => {
     setSheet(root, !root.querySelector("[data-detail]").classList.contains("is-open"));
     draw(root);

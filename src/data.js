@@ -176,5 +176,6 @@ export async function loadHerd() {
     events: events.events || [],
     now: SAMPLE_NOW,
     windowHours: 12,
+    uplinksStart: herd.uplinksStart || null,
   };
 }
