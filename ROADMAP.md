@@ -19,6 +19,18 @@ This list covers the open demo and its open docs. It is not a plan for the Fiber
 - CI that runs lint, tests, and the build on every pull request
 - A draft of the FiberShare record format (animal, shearing, fleece, fiber lot) as JSON Schemas in `docs/schemas/`, with fake examples only. It is posted for comment and is not final.
 
+## Planned: decision loops
+
+Each loop does one job and suggests; the rancher decides. Answers are stored so the next suggestion fits the ranch better. See the table in the [README](README.md#what-the-loops-do).
+
+- Find an animal in trouble: tune alerts from the rancher's confirm and dismiss answers (the movement and distress feed to Predator Watch is built)
+- Catch a dying or silent tracker: suggest a charge, a swap or a check, from each device's normal check-in pattern
+- Plan the next paddock move: suggest when and where to move a group
+- Plan a move ahead of fire or smoke: a move plan built from ranch sensors and public fire and smoke layers
+- Warn neighbors about predator activity: a heads-up when confirmed events cluster, for ranches that opt in
+- Link fiber quality to breeding and grazing: match fleece results to animals and grazing seasons
+- In this demo: show each loop with fake data, including the rancher's confirm, change and dismiss step
+
 ## Planned: checks and docs
 
 - A guide for publishing your own copy of this demo
