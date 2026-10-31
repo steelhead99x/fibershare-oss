@@ -1,6 +1,6 @@
 # FiberShare (open source)
 
-FiberShare is a ranch program from BitPrairie LLC. It started with goats and fiber and is growing into a network of local ranchers across the western US, with collar trackers, paddock cameras, and predator and wildfire detection on the ranch.
+FiberShare is a ranch program from BitPrairie LLC, running since about 2020. It started with goats and fiber and is growing into a network of local ranchers across the western US, with collar trackers, paddock cameras, and predator and wildfire detection on the ranch.
 
 Support for a ranch pays for animals and pasture. It is not ownership or an investment return.
 
@@ -23,8 +23,8 @@ flowchart LR
 
 | Job | What it reads | What it suggests | How it improves | Status |
 | --- | --- | --- | --- | --- |
-| **Find an animal in trouble** | Collar movement and SOS button presses | An alert naming the animal, with the readings that set it off | Confirmed and dismissed alerts set when the next one fires, so there are fewer false alarms | Movement and distress feed to Predator Watch: built and tested. Tuning from answers: Planned |
-| **Catch a dying or silent tracker** | Battery level, last check-in, signal at the gateway | Charge or swap a tracker, check a collar that went quiet, check a gateway that is missing readings | Learns each device's normal check-in pattern | Low-battery and quiet-tracker events: in this demo, with sample data. Suggestions: Planned |
+| **Find an animal in trouble** | Collar movement and SOS button presses | An alert naming the animal, with the readings that set it off | Confirmed and dismissed alerts set when the next one fires, so there are fewer false alarms | In use in the FiberShare app: alerts, and the rancher's confirm or dismiss. Built and tested: the movement and distress feed to Predator Watch. Planned: learning from the rancher's answers |
+| **Catch a dying or silent tracker** | Battery level, last check-in, signal at the gateway | Charge or swap a tracker, check a collar that went quiet, check a gateway that is missing readings | Learns each device's normal check-in pattern | In use in the FiberShare app: low-battery and quiet-tracker alerts. Also in this demo, with sample data. Planned: learning each device's pattern |
 | **Plan the next paddock move** | Time each group spends in each paddock, forage notes, weather | When to move a group and where to | Compares each suggestion with what the rancher did and how the paddock recovered | Planned |
 | **Plan a move ahead of fire or smoke** | Ranch temperature, humidity and air readings, plus public fire, smoke and fire-weather layers | A move plan: which animals first, to where, through which gate | The rancher marks what worked after each event | Sensor feed to Wildfire Watch: being built. Move plans: Planned |
 | **Warn neighbors about predator activity** | Confirmed predator events from ranches that opt in | A heads-up to nearby ranchers when confirmed events cluster | More confirmed events make the pattern clearer | Planned. Shared events will be delayed and placed on a coarse grid, with no ranch names or real locations |

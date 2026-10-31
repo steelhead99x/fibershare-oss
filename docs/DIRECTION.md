@@ -6,7 +6,7 @@ How this open-source repository fits into FiberShare and BitPrairie's wider work
 
 FiberShare is for ranchers, local communities, and local government programs in the western US, and for anyone who wants to run the same kind of system on their own land.
 
-The project is a network of local ranchers with gear on the ranch: collar trackers, paddock cameras and live video, and predator and wildfire detection.
+FiberShare has run since about 2020. The project is a network of local ranchers with gear on the ranch: collar trackers, paddock cameras and live video, and predator and wildfire detection.
 
 Planned: early warning from the network to local communities and local government programs, sent only with each rancher's consent.
 
@@ -21,8 +21,8 @@ You can also run the code on your own ranch and share with no one. Any of these 
 
 The automation is what sets FiberShare apart. Intelligence and realtime systems read tracker, sensor and camera data and turn it into alerts and suggestions. The rancher decides every time, and each answer is stored so the next suggestion fits that ranch better. Each loop does one job:
 
-- **Find an animal in trouble.** Built: the movement and distress feed to Predator Watch. Planned: tuning alerts from the rancher's answers.
-- **Catch a dying or silent tracker.** In this demo with sample data. Planned: suggestions to charge, swap or check a device.
+- **Find an animal in trouble.** In use in the FiberShare app: alerts, and the rancher's confirm or dismiss. Built: the movement and distress feed to Predator Watch. Planned: learning from the rancher's answers.
+- **Catch a dying or silent tracker.** In use in the FiberShare app: low-battery and quiet-tracker alerts. Also in this demo with sample data. Planned: learning each device's normal pattern.
 - **Plan the next paddock move.** Planned.
 - **Plan a move ahead of fire or smoke.** Being built: the sensor feed to Wildfire Watch. Planned: move plans.
 - **Warn neighbors about predator activity.** Planned, for ranches that opt in, with delayed events on a coarse grid.

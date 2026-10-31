@@ -23,8 +23,8 @@ This list covers the open demo and its open docs. It is not a plan for the Fiber
 
 Each loop does one job and suggests; the rancher decides. Answers are stored so the next suggestion fits the ranch better. See the table in the [README](README.md#what-the-loops-do).
 
-- Find an animal in trouble: tune alerts from the rancher's confirm and dismiss answers (the movement and distress feed to Predator Watch is built)
-- Catch a dying or silent tracker: suggest a charge, a swap or a check, from each device's normal check-in pattern
+- Find an animal in trouble: learn from the rancher's confirm and dismiss answers. Alerts and the confirm or dismiss step are in use in the FiberShare app, and the movement and distress feed to Predator Watch is built
+- Catch a dying or silent tracker: learn each device's normal check-in pattern. Low-battery and quiet-tracker alerts are in use in the FiberShare app and in this demo
 - Plan the next paddock move: suggest when and where to move a group
 - Plan a move ahead of fire or smoke: a move plan built from ranch sensors and public fire and smoke layers
 - Warn neighbors about predator activity: a heads-up when confirmed events cluster, for ranches that opt in
