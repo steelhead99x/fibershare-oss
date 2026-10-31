@@ -24,6 +24,7 @@ export function nav(active) {
     ["/shop", "Fiber shop"],
     ["/setups", "Setups"],
     ["/architecture", "Build"],
+    ["/rancher", "Rancher"],
   ]
     .map(([href, label]) => {
       const on = active === href;
