@@ -1,7 +1,9 @@
 import { nav, footer } from "./layout.js";
 import { esc } from "./util.js";
 import { cellLabels, cellOf } from "./grid.js";
-import { sortEvents, stateAt } from "./herd-state.js";
+import { keyMoments, sortEvents, stateAt } from "./herd-state.js";
+import { icon } from "./icons.js";
+import { spreadPins } from "./pin-spread.js";
 import { loadHerd, setHideTrackers, setPreferSample } from "./data.js";
 import { lotsForAnimal } from "./records-data.js";
 
@@ -22,6 +24,17 @@ const FILTERS = [
   ["battery", "Battery"],
   ["checkin", "Check-ins"],
 ];
+
+const EVENT_ICONS = {
+  checkin: "signal",
+  battery: "battery",
+  silent: "wifiOff",
+  smoke: "smoke",
+  "smoke-clear": "check",
+  predator: "paw",
+  "predator-clear": "check",
+  sos: "alert",
+};
 
 const STALE_MINUTES = 15;
 let view = null;
@@ -79,15 +92,49 @@ function stage(data, animals, live, cells) {
       ? data.privateView
         ? "No tracker has sent a position yet · grid cells from a hash"
         : "Grid cells come from a hash · not GPS"
-      : "Virtual grid · not GPS · sample herd";
+      : "Virtual grid, not a map";
   return (
     (data.mapSpan
       ? '<div class="paddock paddock-map" id="paddock" role="group" aria-label="Local map of tracker positions">'
-      : '<div class="paddock" id="paddock" role="group" aria-label="Virtual paddock grid, 6 by 4 cells">' +
+      : '<div class="paddock" id="paddock" role="group" aria-label="Paddock grid, 6 by 4 cells. Arrow keys move between animals.">' +
         '<div class="paddock-cells" aria-hidden="true">' + cells + "</div>") +
     '<div class="paddock-haze" data-haze hidden></div>' +
     "<div data-pins></div>" +
     '<div class="pasture-legend">' + legend + "</div></div>"
+  );
+}
+
+const PLAY = icon("play", { size: 16 }) + "<span>Play the day</span>";
+const PAUSE = icon("pause", { size: 16 }) + "<span>Pause</span>";
+
+function stateBox(kind, iconName, title, text, action) {
+  return (
+    '<div class="state state-' + kind + '" role="' + (kind === "error" ? "alert" : "status") + '">' +
+    '<span class="state-icon">' + icon(iconName, { size: 22 }) + "</span>" +
+    "<h2>" + esc(title) + "</h2><p>" + esc(text) + "</p>" + action + "</div>"
+  );
+}
+
+function notices(data) {
+  if (data.mode === "sample" && data.liveStatus === "missing" && data.rancherSignedIn) {
+    return (
+      '<p class="notice notice-warn">' + icon("info", { size: 18 }) +
+      "<span>You are signed in, but this server has no live file yet. Run <code>npm run chirpstack:pull</code> on your own hardware, then reload. Until then you see the sample herd.</span></p>"
+    );
+  }
+  return "";
+}
+
+function moments(events) {
+  const list = keyMoments(events);
+  if (!list.length) return "";
+  return (
+    '<div class="moments" role="group" aria-label="Jump to a moment in the day"><span class="label">Jump to</span>' +
+    list
+      .map((m) => '<button type="button" class="chip" data-moment="' + m.id + '">' + icon(m.id === "smoke" ? "smoke" : "paw", { size: 14 }) + esc(m.label) + " " + esc(timeOf(m.time)) + "</button>")
+      .join("") +
+    '<button type="button" class="chip" data-moment="end">End of day</button>' +
+    '<button type="button" class="btn btn-text btn-small" data-herd-reset>' + icon("reset", { size: 14 }) + "Reset</button></div>"
   );
 }
 
@@ -120,8 +167,7 @@ export async function renderMap() {
       '<div class="source-line"><span class="muted source-time" data-pulled>Pulled ' + esc(pulledMinutes < 1 ? "just now" : pulledMinutes + " min ago") + " (" + esc(timeOf(data.pulledAt)) + ")" + (data.sources?.includes("mqtt") ? " · REST and MQTT" : " · REST") + "</span>" +
       '<button type="button" class="btn btn-ghost btn-small" data-source="sample">Show sample data</button></div>' +
       (stale ? '<p class="fine-print source-note stale-note">This file is more than ' + STALE_MINUTES + " minutes old. Keep it fresh with <code>npm run chirpstack:pull -- --watch=120</code>.</p>" : "")
-    : '<span class="badge">Sample data</span>' +
-      (data.liveAvailable
+    : (data.liveAvailable
         ? '<button type="button" class="btn btn-ghost btn-small" data-source="live">Show live data</button>'
         : "");
 
@@ -129,42 +175,44 @@ export async function renderMap() {
     ? data.privateView
       ? "Your trackers with their real names, device IDs, tags, and positions, read from your ChirpStack server. Only a signed-in rancher gets this view."
       : "Trackers read from a ChirpStack server. Names, device IDs, tags, and positions are hidden. Each tracker sits on a grid cell picked by a hash, not by where it is."
-    : data.loadFailed
-      ? "The herd list did not load. Check public/data/herd.json, then reload this page."
-      : "Sample goats on a virtual paddock grid. The grid is a drawing, not a map, and this is not a real ranch herd.";
+    : "Eight sample goats on a paddock grid. The grid is a drawing, not a map. Play the day to see the alerts.";
 
   const cells = cellLabels()
     .map((label) => '<div class="cell" data-cell="' + label + '"><span>' + label + "</span></div>")
     .join("");
 
   const body = animals.length
-    ? '<div class="stat-row" data-stats></div>' +
+    ? notices(data) +
+      '<div class="stat-row" data-stats></div>' +
       '<div class="herd-layout">' +
-      '<div class="herd-main">' +
-      '<div class="paddock-banner" data-banner hidden></div>' +
-      stage(data, animals, live, cells) +
+      '<div class="herd-main" data-tour="grid">' +
+      '<div class="paddock-wrap"><div class="paddock-banner" data-banner hidden></div>' + stage(data, animals, live, cells) + "</div>" +
       (events.length
         ? '<div class="playback">' +
-          '<button type="button" class="btn btn-primary btn-small" data-play>Play the day</button>' +
+          '<button type="button" class="btn btn-primary btn-small" data-play>' + PLAY + "</button>" +
           '<label class="visually-hidden" for="scrub">Step through the event feed</label>' +
           '<input id="scrub" type="range" min="0" max="' + events.length + '" value="' + events.length + '" data-scrub />' +
           '<output class="clock" for="scrub" data-clock></output>' +
+          (live ? "" : moments(events)) +
           "</div>"
         : "") +
       "</div>" +
-      '<aside class="detail" data-detail aria-live="polite"></aside>' +
+      '<aside class="detail" data-detail data-tour="detail" aria-label="Animal details">' +
+      '<button type="button" class="sheet-handle" data-sheet aria-expanded="false"><span class="avatar" data-sheet-avatar></span><span class="sheet-title"><strong data-sheet-name></strong><small data-sheet-meta></small></span>' +
+      icon("chevronUp", { cls: "i-up" }) + icon("chevronDown", { cls: "i-down" }) + "</button>" +
+      '<div class="detail-body" data-detail-body aria-live="polite"></div></aside>' +
       "</div>" +
       '<div class="herd-lower">' +
       '<section class="section" aria-labelledby="herd-list-title"><h2 class="section-rule" id="herd-list-title">' +
       (live ? "Trackers" : "Herd") +
       '</h2><ol class="goat-list" data-list></ol></section>' +
       '<section class="section feed-section" aria-labelledby="feed-title">' +
-      '<div class="feed-head"><h2 class="section-rule" id="feed-title">Event feed</h2>' +
+      '<div class="feed-head" data-tour="feed"><h2 class="section-rule" id="feed-title">Event feed</h2>' +
       (live ? '<span class="badge badge-live">Live</span>' : '<span class="badge badge-sim">Simulated</span>') +
       "</div>" +
       (live
         ? '<p class="muted feed-note">Check-ins, battery readings, and SOS from your ChirpStack server. Predator and smoke alerts are not part of the live pull.</p>'
-        : '<p class="muted feed-note">One made-up day for the sample herd. None of these events happened.</p>') +
+        : '<p class="muted feed-note">One made-up day for the sample herd. None of it happened.</p>') +
       '<div class="chips" role="group" aria-label="Filter the event feed">' +
       FILTERS.map(
         ([key, label]) =>
@@ -173,16 +221,20 @@ export async function renderMap() {
       "</div>" +
       '<ol class="feed" data-feed></ol></section>' +
       "</div>"
-    : '<div class="empty">No goats are listed yet. Add them in public/data/herd.json and reload.</div>';
+    : data.loadFailed
+      ? stateBox("error", "alert", "The herd did not load", "The page could not read public/data/herd.json. Check that the file is there and is valid JSON, then try again.", '<button type="button" class="btn btn-primary" data-retry>' + icon("reset", { size: 18 }) + "Try again</button>")
+      : stateBox("empty", "herd", "No animals yet", "Add goats to public/data/herd.json, then reload this page.", "");
 
   return (
     nav("/map") +
-    '<main class="wrap wrap-wide" id="main">' +
+    '<main class="wrap wrap-wide herd-page" id="main">' +
     '<section class="page-head head-row"><div>' +
-    "<h1>" +
+    '<div class="title-row"><h1>' +
     esc(data.ranch) +
-    '</h1><p class="lede">' +
-    lede +
+    "</h1>" +
+    (live ? "" : '<span class="badge badge-sim">Sample data</span>') +
+    '</div><p class="lede">' +
+    (data.loadFailed && !animals.length ? "The herd view needs the sample herd file." : lede) +
     '</p></div><div class="source-box">' +
     sourceBadge +
     "</div></section>" +
@@ -191,6 +243,8 @@ export async function renderMap() {
     footer()
   );
 }
+
+let resizeObserver = null;
 
 function currentState() {
   return stateAt(view.data.animals, view.events, view.step);
@@ -206,6 +260,9 @@ function renderPins(root, state) {
   const holder = root.querySelector("[data-pins]");
   if (!holder) return;
   const existing = new Map([...holder.querySelectorAll(".goat")].map((el) => [el.dataset.id, el]));
+  const box = holder.parentElement?.getBoundingClientRect();
+  const shown = state.animals.filter((animal) => !(view.data.mapSpan && !animal.onMap));
+  const drawAt = new Map(spreadPins(shown, box?.width || 0, box?.height || 0).map((p) => [p.id, p]));
   for (const animal of state.animals) {
     if (view.data.mapSpan && !animal.onMap) continue;
     let pin = existing.get(animal.id);
@@ -214,19 +271,27 @@ function renderPins(root, state) {
       pin.type = "button";
       pin.className = "goat";
       pin.dataset.id = animal.id;
-      pin.innerHTML = '<span aria-hidden="true">' + esc(initials(animal.alias || animal.name)) + "</span>";
+      pin.innerHTML =
+        '<span class="goat-short" aria-hidden="true">' + esc(initials(animal.alias || animal.name)) + "</span>" +
+        '<span class="goat-full" aria-hidden="true">' + esc(animal.name) + "</span>" +
+        '<span class="visually-hidden" data-pin-label></span>';
       pin.addEventListener("click", () => select(root, animal.id));
       holder.appendChild(pin);
     }
-    pin.style.left = animal.x + "%";
-    pin.style.top = animal.y + "%";
+    const at = drawAt.get(animal.id) || animal;
+    pin.style.left = at.x.toFixed(2) + "%";
+    pin.style.top = at.y.toFixed(2) + "%";
     const on = animal.id === view.selected;
     pin.classList.toggle("is-active", on);
     pin.classList.toggle("is-low", Number.isFinite(animal.battery) && animal.battery < LOW_BATTERY);
     pin.classList.toggle("is-silent", animal.silent);
     pin.classList.toggle("is-sos", Boolean(animal.sos || animal.sensors?.sos));
     pin.setAttribute("aria-pressed", String(on));
-    pin.setAttribute("aria-label", animal.name + (view.data.mapSpan ? "" : ", cell " + cellOf(animal.x, animal.y)));
+    // The accessible name is the full name, which the pin shows when picked.
+    const label = animal.name + (view.data.mapSpan ? "" : ", cell " + cellOf(animal.x, animal.y));
+    const holderLabel = pin.querySelector("[data-pin-label]");
+    if (holderLabel && holderLabel.textContent !== label) holderLabel.textContent = label;
+    pin.title = animal.name;
   }
 }
 
@@ -239,13 +304,13 @@ function renderStats(root, state) {
   const low = state.animals.filter((a) => Number.isFinite(a.battery) && a.battery < LOW_BATTERY).length;
   const alerts = state.alertCells.length + (state.smoke ? 1 : 0) + state.animals.filter((a) => a.silent || a.sos).length;
   const stats = [
-    [state.animals.length, view.data.mode === "live" ? "trackers" : "animals"],
-    [recent, "checked in, last hour"],
-    [low, "low battery"],
-    [alerts, "open alerts"],
+    [state.animals.length, view.data.mode === "live" ? "trackers" : "animals", "herd", ""],
+    [recent, "checked in, last hour", "signal", ""],
+    [low, "low battery", "battery", low > 0 ? " stat-low" : ""],
+    [alerts, alerts === 1 ? "open alert" : "open alerts", "alert", alerts > 0 ? " stat-warn" : ""],
   ];
   holder.innerHTML = stats
-    .map(([n, label], i) => '<div class="stat' + (i === 3 && n > 0 ? " stat-warn" : "") + '"><strong>' + n + "</strong><span>" + label + "</span></div>")
+    .map(([n, label, iconName, cls]) => '<div class="stat' + cls + '"><span class="stat-icon">' + icon(iconName) + "</span><div><strong>" + n + "</strong><span>" + label + "</span></div></div>")
     .join("");
 }
 
@@ -257,14 +322,21 @@ function renderGrid(root, state) {
   if (haze) haze.hidden = !state.smoke;
   const banner = root.querySelector("[data-banner]");
   if (banner) {
-    const lines = [];
-    for (const cell of state.alertCells) lines.push("Predator alert at " + cell);
-    if (state.smoke) lines.push("Smoke haze rising upwind");
-    banner.hidden = lines.length === 0;
-    banner.innerHTML = lines.map((line) => "<span>" + esc(line) + "</span>").join("") + (lines.length ? '<span class="badge badge-sim">Simulated</span>' : "");
+    const cards = [];
+    for (const cell of state.alertCells) cards.push(["paw", "", "Predator alert near " + cell, "Predator Watch · the herd is moving away"]);
+    if (state.smoke) cards.push(["smoke", " is-smoke", "Smoke haze upwind", "Wildfire Watch · no fire reported nearby"]);
+    const html = cards
+      .map(([name, cls, title, sub]) => '<div class="alert-card' + cls + '" role="status"><span class="alert-icon">' + icon(name, { size: 18 }) + "</span><span><strong>" + esc(title) + "</strong><small>" + esc(sub) + '</small></span><span class="badge badge-sim">Simulated</span></div>')
+      .join("");
+    banner.hidden = cards.length === 0;
+    // Only touch the DOM when the alerts change, so the cards do not flicker.
+    if (banner.dataset.html !== html) {
+      banner.dataset.html = html;
+      banner.innerHTML = html;
+    }
   }
   const clock = root.querySelector("[data-clock]");
-  if (clock) clock.textContent = timeOf(clockIso()) + " · " + view.step + " of " + view.events.length + " events";
+  if (clock) clock.innerHTML = "<strong>" + esc(timeOf(clockIso())) + "</strong>" + view.step + " of " + view.events.length + " events";
 }
 
 function batteryBar(value) {
@@ -331,12 +403,20 @@ function sensorRows(animal) {
 }
 
 function renderDetail(root, state) {
-  const holder = root.querySelector("[data-detail]");
+  const holder = root.querySelector("[data-detail-body]");
   if (!holder) return;
   const animal = state.animals.find((a) => a.id === view.selected);
+  const sheetName = root.querySelector("[data-sheet-name]");
   if (!animal) {
     holder.innerHTML = '<p class="muted">Pick an animal on the grid or in the list.</p>';
+    if (sheetName) sheetName.textContent = "Pick an animal";
     return;
+  }
+  if (sheetName) {
+    sheetName.textContent = animal.name;
+    root.querySelector("[data-sheet-avatar]").textContent = initials(animal.alias || animal.name);
+    root.querySelector("[data-sheet-meta]").textContent =
+      (Number.isFinite(animal.battery) ? "Battery " + Math.round(animal.battery) + "%" : "Battery not reported") + " · " + (animal.lastSeen ? "seen " + ago(animal.lastSeen, clockIso()) : "not seen yet");
   }
   const live = view.data.mode === "live";
   const full = live && view.data.privateView;
@@ -354,12 +434,13 @@ function renderDetail(root, state) {
     rows.push(["Status", esc(animal.silent ? "tracker quiet" : animal.status)]);
   }
   holder.innerHTML =
+    '<div class="detail-top"><span class="avatar" aria-hidden="true">' + esc(initials(animal.alias || animal.name)) + "</span><div>" +
     '<p class="detail-kicker">' + (live ? (full ? "Tracker · private" : "Tracker") : "Animal") + "</p>" +
-    "<h2>" + esc(animal.name) + "</h2>" +
+    "<h2>" + esc(animal.name) + "</h2></div></div>" +
     '<dl class="facts">' + rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("") + "</dl>" +
     uplinkChart(animal.uplinks, view.data.windowHours) +
     (lots.length
-      ? '<p class="detail-link"><a class="btn btn-ghost btn-small" href="#/trace">Follow ' + esc(animal.name) + "'s fleece to the " + esc(lots[0]) + " lot</a></p>"
+      ? '<p class="detail-link"><a class="btn btn-ghost btn-small" href="#/trace"><span>Follow ' + esc(animal.name) + "'s fleece to the " + esc(lots[0]) + " lot</span>" + icon("arrowRight", { size: 16 }) + "</a></p>"
       : "") +
     (live && !full
       ? '<p class="fine-print">' + (view.data.rancher ? "Tracker details are hidden. Turn off Hide tracker details to see the real name, ID, and position." : "Tracker details are hidden. Only a signed-in rancher can see them.") + "</p>"
@@ -372,18 +453,18 @@ function renderList(root, state) {
   if (!holder) return;
   const live = view.data.mode === "live";
   holder.innerHTML = state.animals
-    .map((animal, i) => {
+    .map((animal) => {
       const on = animal.id === view.selected;
       const meta = live
         ? [view.data.privateView ? animal.alias : view.data.mapSpan ? "" : cellOf(animal.x, animal.y), animal.signal ? "signal " + animal.signal : "", Number.isFinite(animal.battery) ? "battery " + Math.round(animal.battery) + "%" : "battery not reported", "seen " + ago(animal.lastSeen, clockIso())]
         : [animal.status, animal.breed, animal.tracker, Number.isFinite(animal.battery) ? "battery " + animal.battery + "%" : ""];
       return (
         '<li><button type="button" class="goat-row' + (on ? " selected" : "") + '" data-goat-card="' + esc(animal.id) + '" aria-pressed="' + on + '">' +
-        '<span class="feature-num" aria-hidden="true">' + String(i + 1).padStart(2, "0") + "</span>" +
+        '<span class="avatar" aria-hidden="true">' + esc(initials(animal.alias || animal.name)) + "</span>" +
         "<div><h3>" + esc(animal.name) +
-        (Number.isFinite(animal.battery) && animal.battery < LOW_BATTERY ? ' <span class="badge badge-warn">low battery</span>' : "") +
-        (animal.silent ? ' <span class="badge badge-warn">quiet</span>' : "") +
-        (animal.sos || animal.sensors?.sos ? ' <span class="badge badge-warn">SOS</span>' : "") +
+        (Number.isFinite(animal.battery) && animal.battery < LOW_BATTERY ? ' <span class="badge badge-warn">Low battery</span>' : "") +
+        (animal.silent ? ' <span class="badge badge-quiet">Quiet</span>' : "") +
+        (animal.sos || animal.sensors?.sos ? ' <span class="badge badge-alert">SOS</span>' : "") +
         '</h3><p class="row-meta">' + meta.filter(Boolean).map(esc).join(" · ") + "</p></div></button></li>"
       );
     })
@@ -399,7 +480,7 @@ function renderFeed(root, state) {
   const names = new Map(view.data.animals.map((a) => [a.id, a.name]));
   const items = [...state.shown].reverse().filter((event) => matchesFilter(event, view.filter));
   if (!items.length) {
-    holder.innerHTML = '<li class="feed-empty muted">' + (state.shown.length ? "No events match this filter yet." : "Press Play the day to start.") + "</li>";
+    holder.innerHTML = '<li class="feed-empty">' + (state.shown.length ? "Nothing matches this filter yet." : "Nothing yet. Press Play the day to start.") + "</li>";
     return;
   }
   holder.innerHTML = items
@@ -409,6 +490,7 @@ function renderFeed(root, state) {
       const who = names.get(event.animalId);
       return (
         '<li class="feed-item ' + kind + '"' + (event.animalId ? ' data-event-animal="' + esc(event.animalId) + '"' : "") + ">" +
+        '<span class="feed-icon" aria-hidden="true">' + icon(EVENT_ICONS[event.type] || "info", { size: 16 }) + "</span>" +
         '<time datetime="' + esc(event.time) + '">' + esc(timeOf(event.time)) + "</time>" +
         '<div><span class="feed-type">' + esc(EVENT_LABELS[event.type] || event.type) + (who && view.data.mode !== "live" ? " · " + esc(who) : "") + "</span>" +
         "<p>" + esc(event.text) + "</p></div></li>"
@@ -432,10 +514,49 @@ function draw(root) {
   if (scrub) scrub.value = String(view.step);
 }
 
-function select(root, id) {
+function select(root, id, { open = true } = {}) {
   view.selected = id;
+  if (open) setSheet(root, true);
   draw(root);
   rancherMap?.select(id);
+}
+
+function setSheet(root, open) {
+  const aside = root.querySelector("[data-detail]");
+  const handle = root.querySelector("[data-sheet]");
+  if (!aside || !handle) return;
+  aside.classList.toggle("is-open", open);
+  handle.setAttribute("aria-expanded", String(open));
+}
+
+function reset(root) {
+  stop(root);
+  view.step = view.events.length;
+  view.filter = "all";
+  root.querySelectorAll("[data-filter]").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.filter === "all")));
+  const first = view.data.animals.find((a) => a.id === "bramble") || view.data.animals[0];
+  view.selected = first?.id || null;
+  setSheet(root, false);
+  draw(root);
+}
+
+/**
+ * Set the herd view from outside, for the guided tour: jump to a moment
+ * ("smoke", "predator", or "end"), pick an animal, open the bottom sheet.
+ */
+export function setHerdView({ moment, select: id, openSheet = false } = {}) {
+  const root = document.getElementById("app");
+  if (!view || !root?.querySelector("[data-scrub]")) return false;
+  stop(root);
+  if (moment === "end") view.step = view.events.length;
+  else if (moment) {
+    const m = keyMoments(view.events).find((x) => x.id === moment);
+    if (m) view.step = m.step;
+  }
+  if (id && view.data.animals.some((a) => a.id === id)) view.selected = id;
+  setSheet(root, openSheet);
+  draw(root);
+  return true;
 }
 
 // Load Leaflet only for a signed-in rancher with details showing. If it
@@ -462,7 +583,7 @@ function stop(root) {
   if (view.timer) clearInterval(view.timer);
   view.timer = null;
   const btn = root.querySelector("[data-play]");
-  if (btn) btn.textContent = "Play the day";
+  if (btn) btn.innerHTML = PLAY;
 }
 
 function reducedMotion() {
@@ -483,6 +604,52 @@ export function bindMap(root) {
   });
   if (!view.data.animals.length) return;
   draw(root);
+  // Spread the pins again when the paddock changes size (rotation, resize).
+  const paddock = root.querySelector("#paddock");
+  if (paddock && "ResizeObserver" in window) {
+    resizeObserver?.disconnect();
+    let last = paddock.clientWidth;
+    resizeObserver = new ResizeObserver(() => {
+      if (!paddock.isConnected) return resizeObserver.disconnect();
+      if (Math.abs(paddock.clientWidth - last) < 2) return;
+      last = paddock.clientWidth;
+      renderPins(root, currentState());
+    });
+    resizeObserver.observe(paddock);
+  }
+  root.querySelector("[data-sheet]")?.addEventListener("click", () => {
+    setSheet(root, !root.querySelector("[data-detail]").classList.contains("is-open"));
+    draw(root);
+  });
+  root.querySelectorAll("[data-moment]").forEach((chip) => {
+    chip.addEventListener("click", () => setHerdView({ moment: chip.dataset.moment }));
+  });
+  root.querySelector("[data-herd-reset]")?.addEventListener("click", () => reset(root));
+  // Arrow keys move between pins, toward the nearest one in that direction.
+  root.querySelector("[data-pins]")?.addEventListener("keydown", (event) => {
+    const dirs = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
+    const dir = dirs[event.key];
+    const from = event.target.closest(".goat");
+    if (!dir || !from) return;
+    event.preventDefault();
+    const pos = (el) => [parseFloat(el.style.left), parseFloat(el.style.top)];
+    const [fx, fy] = pos(from);
+    let best = null;
+    let bestScore = Infinity;
+    for (const pin of root.querySelectorAll("[data-pins] .goat")) {
+      if (pin === from) continue;
+      const [x, y] = pos(pin);
+      const along = (x - fx) * dir[0] + (y - fy) * dir[1];
+      if (along <= 0) continue;
+      const across = Math.abs((x - fx) * dir[1]) + Math.abs((y - fy) * dir[0]);
+      const score = along + across * 2;
+      if (score < bestScore) {
+        bestScore = score;
+        best = pin;
+      }
+    }
+    best?.focus();
+  });
   if (view.data.rancherMap) mountMap(root);
   const scrub = root.querySelector("[data-scrub]");
   scrub?.addEventListener("input", () => {
@@ -497,7 +664,7 @@ export function bindMap(root) {
       return;
     }
     if (view.step >= view.events.length) view.step = 0;
-    play.textContent = "Pause";
+    play.innerHTML = PAUSE;
     draw(root);
     view.timer = setInterval(
       () => {

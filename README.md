@@ -93,8 +93,9 @@ All of these share the same sensors, LoRa radios and solar power on the ranch.
 - **Three setups**, side by side.
 - **Your own trackers.** Read your trackers from your own ChirpStack v4 server. See [docs/chirpstack.md](docs/chirpstack.md).
 - **Rancher sign-in and a real map.** The public always gets hidden tracker data. A signed-in rancher gets real names and positions on a map with public map layers: imagery, topo and street basemaps, wildfire perimeters and incidents, weather warnings, fire weather, smoke, air quality, federal land ownership, and any ArcGIS or GeoJSON layer you add. See [docs/rancher-access.md](docs/rancher-access.md).
-- **Sample fiber list** with no checkout, and a page that explains ranch support.
-- Runs on Node 20 and works offline from the bundled sample data.
+- **A guided tour for live demos.** Press Tour in the header. Eight short steps: what FiberShare is, the herd, a smoke alert, a predator alert, one goat up close, the fleece trace, the rancher map and the setups. The tour always uses the sample data, so it works offline. Arrow keys move between steps and Esc ends it. The last step has Reset demo, which clears the demo's saved settings except the theme.
+- **Sample fiber list** with no checkout, and a page that explains ranch support. Checkout and ranch support are Planned.
+- Runs on Node 20 or 22 and works offline from the bundled sample data.
 
 This repo has no secrets: no API keys, no mail settings and no real collar data. A test checks every committed file for DevEUI-like hex strings and coordinates.
 

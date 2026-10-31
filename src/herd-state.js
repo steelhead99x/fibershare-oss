@@ -56,3 +56,23 @@ export function stateAt(animals, events, count) {
   }
   return { animals: [...byId.values()], alertCells: [...alerts.keys()], smoke, shown: upto };
 }
+
+/**
+ * Steps worth jumping to in the sample day: each alert just before it
+ * clears, so the grid shows the alert and what the herd did about it.
+ * Returns [{ id, label, step, time }] in time order.
+ */
+export function keyMoments(events) {
+  const sorted = sortEvents(events);
+  const out = [];
+  const add = (id, label, startType, clearType) => {
+    const start = sorted.findIndex((e) => e.type === startType);
+    if (start < 0) return;
+    const clear = sorted.findIndex((e, i) => i > start && e.type === clearType && (!sorted[start].cell || e.cell === sorted[start].cell));
+    const step = clear > start ? clear : start + 1;
+    out.push({ id, label, step, time: sorted[start].time });
+  };
+  add("smoke", "Smoke", "smoke", "smoke-clear");
+  add("predator", "Predator", "predator", "predator-clear");
+  return out.sort((a, b) => a.step - b.step);
+}
