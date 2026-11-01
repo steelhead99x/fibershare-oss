@@ -81,7 +81,7 @@ function stage(data, animals, live, cells) {
       : '<div class="paddock" id="paddock" role="group" aria-label="Paddock grid, 6 by 4 cells. Arrow keys move between animals, Enter shows one.">' +
         '<div class="paddock-cells" aria-hidden="true">' + cells + "</div>") +
     '<div class="paddock-haze" data-haze hidden></div>' +
-    "<svg class="trail-layer" data-trail aria-hidden="true"></svg><div data-pins></div>" +
+    '<svg class="trail-layer" data-trail aria-hidden="true"></svg><div data-pins></div>' +
     (legend ? '<div class="pasture-legend">' + legend + "</div>" : "") +
     "</div>"
   );
