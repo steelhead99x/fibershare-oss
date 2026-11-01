@@ -47,7 +47,7 @@ export function displacement(a, b) {
 
 /**
  * Alerts from the tracker data: low battery, quiet, not-moving, out-of-paddock, or SOS.
- * animals: [{ id, name, battery, externalPower, lastSeen, lastMoved, x, y, status, sos, sensors }]
+ * animals: [{ id, name, battery, externalPower, lastSeen, lastMoved, lastFix, x, y, status, sos, sensors }]
  * now: ISO time to measure "quiet" from.
  * jobs: which jobs run. A job that is off adds nothing.
  * Each alert has `why`: the rule and the reading that raised it.
@@ -98,10 +98,13 @@ export function trackerAlerts(animals, now, rules = ALERT_RULES, jobs = ALL_ON) 
 
     if (jobs.still) {
       const moved = ms(a.lastMoved);
-      if (seen !== null && nowMs !== null && moved !== null) {
-        const quietGap = Math.round((nowMs - seen) / 60000);
+      // Prefer lastFix (last positioned reading). Fall back to lastSeen for live
+      // trackers that set lastSeen on every fix and do not send lastFix.
+      const fix = ms(a.lastFix) ?? seen;
+      if (fix !== null && nowMs !== null && moved !== null) {
+        const quietGap = Math.round((nowMs - fix) / 60000);
         const stillFor = Math.round((nowMs - moved) / 60000);
-        // Still checking in (not quiet) but position has not moved enough.
+        // Still getting position fixes (not quiet on fixes) but has not moved enough.
         if (quietGap <= rules.quietMinutes && stillFor > rules.stillMinutes) {
           out.push({
             id: "still:" + a.id + ":" + a.lastMoved,

@@ -24,6 +24,9 @@ export function stateAt(animals, events, count, { uplinksStart = null, now = nul
       battery: first && Number.isFinite(first.battery) ? first.battery : animal.battery,
       lastSeen: null,
       lastMoved: first ? first.time : animal.lastMoved || null,
+      // Last event that carried a position. Hourly uplink counts update lastSeen
+      // only, so not-moving alerts use lastFix and ignore those count-only bumps.
+      lastFix: first ? first.time : animal.lastFix || null,
       silent: false,
       sos: false,
     });
@@ -37,6 +40,7 @@ export function stateAt(animals, events, count, { uplinksStart = null, now = nul
         const prev = { x: animal.x, y: animal.y };
         animal.x = event.x;
         animal.y = event.y;
+        animal.lastFix = event.time;
         const dist = Math.hypot(animal.x - prev.x, animal.y - prev.y);
         if (!animal.lastMoved || dist >= ALERT_RULES.stillDistance) animal.lastMoved = event.time;
       }

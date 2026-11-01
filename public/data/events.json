@@ -281,10 +281,10 @@
       "time": "2026-09-06T17:55:00",
       "type": "checkin",
       "animalId": "sage",
-      "x": 80,
-      "y": 66,
+      "x": 86,
+      "y": 70,
       "battery": 58,
-      "text": "Tracker 5 checked in."
+      "text": "Sample: Tracker 5 walks farther into the paddock before evening."
     },
     {
       "id": "e25",

@@ -86,6 +86,19 @@ test("still rule: checking in near the same spot opens a not-moving alert", () =
   assert.equal(trackerAlerts(animal({}), now, ALERT_RULES, { still: false }).filter((a) => a.kind === "still").length, 0);
 });
 
+
+test("still rule: uplink-only lastSeen without a recent position fix does not open not-moving", () => {
+  const now = "2026-09-06T07:45:00";
+  // Dawn fix, then hourly uplinks only (lastSeen recent, lastFix still dawn).
+  const animals = [{ id: "b", name: "Bramble", battery: 85, lastSeen: now, lastFix: "2026-09-06T05:44:00", lastMoved: "2026-09-06T05:44:00", x: 30, y: 22 }];
+  assert.equal(trackerAlerts(animals, now).filter((a) => a.kind === "still").length, 0);
+  // A fresh position fix at the same spot would open it once past the limit.
+  assert.equal(
+    trackerAlerts([{ ...animals[0], lastFix: now }], now).filter((a) => a.kind === "still").length,
+    1
+  );
+});
+
 test("paddock rule: a position outside the bounds opens an out-of-paddock alert", () => {
   const now = "2026-09-06T14:10:00";
   assert.equal(inPaddock(50, 50), true);
